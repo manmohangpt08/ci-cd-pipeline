@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
         - name: system-monitor
-          image: manmohangpt08/system-monitor:latest
+          image: manmohangpt08/system-monitor:1
           ports:
             - containerPort: 8080
