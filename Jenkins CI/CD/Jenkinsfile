@@ -1,0 +1,79 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-cred')
+        DOCKER_IMAGE = "manmohangpt08/system-monitor"
+        APP_NAME = "system-monitor"
+        CHART_PATH = "system-monitor"  // path to Helm chart folder
+        KUBE_CONTEXT = "your-k8s-context" // optional if kubectl already configured
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo "Cloning repository..."
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    IMAGE_TAG = "${env.BUILD_NUMBER}"
+                    sh """
+                        docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} .
+                    """
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    sh """
+                        echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin
+                        docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+                    """
+                }
+            }
+        }
+
+        stage('Update Helm Values') {
+            steps {
+                script {
+                    sh """
+                        sed -i 's/tag: .*/tag: "${IMAGE_TAG}"/' ${CHART_PATH}/values.yaml
+                        git config user.email "jenkins@ci.local"
+                        git config user.name "Jenkins"
+                        git add ${CHART_PATH}/values.yaml
+                        git commit -m "Update image tag to ${IMAGE_TAG}" || echo "No changes to commit"
+                    """
+                }
+            }
+        }
+
+        stage('Deploy with Helm') {
+            steps {
+                script {
+                    sh """
+                        helm upgrade --install ${APP_NAME} ${CHART_PATH} \
+                          --set image.repository=${DOCKER_IMAGE} \
+                          --set image.tag=${IMAGE_TAG} \
+                          --namespace default \
+                          --create-namespace
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful!"
+        }
+        failure {
+            echo "❌ Deployment failed!"
+        }
+    }
+}
