@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: system-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: system-monitor
+  template:
+    metadata:
+      labels:
+        app: system-monitor
+    spec:
+      containers:
+        - name: system-monitor
+          image: manmohangpt08/system-monitor:latest
+          ports:
+            - containerPort: 8080
